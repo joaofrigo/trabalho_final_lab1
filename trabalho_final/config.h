@@ -15,5 +15,9 @@
 #define STAGE_DURATION_SEC 60.0
 // Bônus base para avanço de etapa
 #define BONUS_BASE 50
+// Arquivo de recordes
+#define RECORDS_FILE "records.txt"
+// Comprimento máximo de apelido
+#define MAX_NAME_LEN 32
 
 #endif // CONFIG_H

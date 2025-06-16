@@ -74,10 +74,7 @@ int game_state_remove_uniform_columns(GameState *gs) {
         if (first == EMPTY_CELL) continue;
         bool uniform = true;
         for (int r = 1; r < NUM_LINHAS; r++) {
-            if (gs->board[r][c] != first) {
-                uniform = false;
-                break;
-            }
+            if (gs->board[r][c] != first) { uniform = false; break; }
         }
         if (uniform) {
             for (int r = 0; r < NUM_LINHAS; r++) {
@@ -115,8 +112,6 @@ int game_state_clear_row(GameState *gs, int row) {
             removed++;
         }
     }
-    if (removed > 0) {
-        gs->score -= 2;
-    }
+    if (removed > 0) { gs->score -= 2; }
     return removed;
 }
