@@ -1,13 +1,12 @@
-// main.c
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 #include "janela.h"
 #include "config.h"
-#include "game_state.h"
-#include "history.h"
+#include "estado_jogo.h"
+#include "historico.h"
 
-static const cor_t COLORS[] = {
+static const cor_t CORES[] = {
     {1.0f, 0.0f, 0.0f, 1.0f},
     {0.0f, 1.0f, 0.0f, 1.0f},
     {0.0f, 0.0f, 1.0f, 1.0f},
@@ -17,210 +16,311 @@ static const cor_t COLORS[] = {
     {1.0f, 0.5f, 0.0f, 1.0f},
     {0.5f, 0.0f, 0.5f, 1.0f}
 };
-static const int COLOR_COUNT = sizeof(COLORS) / sizeof(COLORS[0]);
+static const int QTD_CORES = sizeof(CORES) / sizeof(CORES[0]);
 
-// Exibe instruções antes de começar e aguarda Enter ou 'C' para ver recordes
-void show_instructions(History *history) {
+void mostrar_instrucoes(Historico *historico) {
     j_seleciona_fonte(NULL, 18);
-    bool waiting = true;
-    while (waiting) {
+    bool esperando = true;
+    while (esperando) {
         j_texto((ponto_t){20, 40}, (cor_t){1,1,1,1}, "Controles:");
         j_texto((ponto_t){20, 80}, (cor_t){1,1,1,1}, "M: alterna modo Linha/Coluna");
         j_texto((ponto_t){20, 110}, (cor_t){1,1,1,1}, "Setas: mover selecionado / girar");
-        j_texto((ponto_t){20, 140}, (cor_t){1,1,1,1}, "X: limpa linha (modo linha) - penalidade 2 pontos");
-        j_texto((ponto_t){20, 170}, (cor_t){1,1,1,1}, "ESC: sair");
+        j_texto((ponto_t){20, 140}, (cor_t){1,1,1,1}, "X: limpar linha (modo linha) - penalidade 2 pontos");
+        j_texto((ponto_t){20, 170}, (cor_t){1,1,1,1}, "ESC: encerrar partida e salvar score");
         j_texto((ponto_t){20, 200}, (cor_t){1,1,1,1}, "C: ver recordes");
         j_texto((ponto_t){20, 240}, (cor_t){1,1,1,1}, "Pressione Enter para iniciar...");
         j_mostra();
-        tecla_t t = j_tecla();
-        if (t == T_ENTER) waiting = false;
-        else if (t == 'c' || t == 'C') {
-            history_show(history);
-        } else if (t == T_ESC) {
-            waiting = false;
+        tecla_t tecla = j_tecla();
+        if (tecla == T_ENTER) {
+            esperando = false;
+        } else if (tecla == 'c' || tecla == 'C') {
+            mostrar_historico(historico);
+        } else if (tecla == T_ESC) {
+            esperando = false;
         }
     }
-    j_seleciona_fonte(NULL, 15);
 }
 
-// Captura nome do jogador via teclado
-void prompt_name(char *out_name) {
+void solicitar_nome(char *nomeSaida) {
     int pos = 0;
-    out_name[0] = '\0';
+    nomeSaida[0] = '\0';
     j_seleciona_fonte(NULL, 18);
-    bool done = false;
-    while (!done) {
+    bool concluido = false;
+    while (!concluido) {
         char prompt[64];
-        snprintf(prompt, sizeof(prompt), "Digite seu nome (max %d chars): %s", MAX_NAME_LEN-1, out_name);
-        // desenha prompt
+        snprintf(prompt, sizeof(prompt), "Digite seu nome (max %d): %s", TAM_MAX_NOME-1, nomeSaida);
         j_texto((ponto_t){20, 40}, (cor_t){1,1,1,1}, prompt);
         j_mostra();
-        tecla_t t = j_tecla();
-        if (t != T_NADA) {
-            if (t == T_ENTER) {
-                if (pos > 0) done = true;
-            } else if (t == T_ESC) {
-                done = true;
-            } else if (t == T_BS || t == T_BACKSPACE) {
+        tecla_t tecla = j_tecla();
+        if (tecla != T_NADA) {
+            if (tecla == T_ENTER) {
                 if (pos > 0) {
-                    pos--; out_name[pos] = '\0';
+                    concluido = true;
                 }
-            } else if ((unsigned char)t >= 32 && (unsigned char)t < 127) {
-                if (pos < MAX_NAME_LEN-1) {
-                    out_name[pos++] = (char)t;
-                    out_name[pos] = '\0';
+            } else if (tecla == T_ESC) {
+                concluido = true;
+            } else if (tecla == T_BS || tecla == T_BACKSPACE) {
+                if (pos > 0) {
+                    pos--;
+                    nomeSaida[pos] = '\0';
+                }
+            } else {
+                unsigned char code = (unsigned char) tecla;
+                if (code >= 32 && code < 127) {
+                    if (pos < TAM_MAX_NOME-1) {
+                        nomeSaida[pos] = (char) tecla;
+                        pos++;
+                        nomeSaida[pos] = '\0';
+                    }
                 }
             }
         }
     }
-    j_seleciona_fonte(NULL, 15);
 }
 
 int main(void) {
-    int win_w = NUM_COLUNAS * CELL_SIZE + 200;
-    int win_h = NUM_LINHAS * CELL_SIZE + 200;
-    tamanho_t tamanho = { .largura = (float)win_w, .altura = (float)win_h };
+    int larguraJanela = NUM_COLUNAS * TAM_CELULA + 200;
+    int alturaJanela = NUM_LINHAS * TAM_CELULA + 200;
+    tamanho_t tamanho = { .largura = (float)larguraJanela, .altura = (float)alturaJanela };
     j_inicializa(tamanho, "Jogo de Tabuleiro");
 
-    History history;
-    history_init(&history);
+    Historico historico;
+    inicializar_historico(&historico);
 
-    show_instructions(&history);
+    mostrar_instrucoes(&historico);
 
-    bool exit_program = false;
-    while (!exit_program) {
-        GameState gs;
-        game_state_init(&gs);
-        int selected_row = 0;
-        int selected_col = 0;
-        bool mode_row = true;
-        double stage_start = j_relogio();
-        int removed_in_stage = 0;
-        bool defeated = false;
-        int last_stage = 1;
+    bool encerrarPrograma = false;
+    while (!encerrarPrograma) {
+        EstadoJogo estado;
+        inicializar_estado(&estado);
+        int indiceLinhaSelecionada = 0;
+        int indiceColunaSelecionada = 0;
+        bool modoLinha = true;
+        double inicioEtapa = j_relogio();
+        int removidasNaEtapa = 0;
+        int ultimaEtapa = 1;
+        bool encerrarPorESC = false;
         while (true) {
-            double now = j_relogio();
-            double elapsed = now - stage_start;
-            double remaining = STAGE_DURATION_SEC - elapsed;
-            if (remaining <= 0) {
-                int half = (NUM_LINHAS * NUM_COLUNAS) / 2;
-                bool passed = (removed_in_stage >= half);
-                // Confirmação
+            double agora = j_relogio();
+            double decorrido = agora - inicioEtapa;
+            double restante = DURACAO_ETAPA_SEG - decorrido;
+            if (restante <= 0) {
+                int minimo = (NUM_LINHAS * NUM_COLUNAS) / 2;
+                bool passou = (removidasNaEtapa >= minimo);
                 j_seleciona_fonte(NULL, 18);
-                bool wait = true;
-                while (wait) {
-                    if (passed) {
-                        char msg1[128];
-                        snprintf(msg1, sizeof(msg1), "Etapa %d concluida! Removidas %d (min %d)", gs.etapa, removed_in_stage, half);
-                        j_texto((ponto_t){20, 40}, (cor_t){1,1,1,1}, msg1);
-                        int bonus = BONUS_BASE * gs.etapa;
-                        char msg2[128];
-                        snprintf(msg2, sizeof(msg2), "Bonus: %d. Score atual: %d. Enter para proxima etapa.", bonus, gs.score + bonus);
-                        j_texto((ponto_t){20, 80}, (cor_t){1,1,1,1}, msg2);
+                bool aguardando = true;
+                while (aguardando) {
+                    if (passou) {
+                        char texto1[128];
+                        snprintf(texto1, sizeof(texto1), "Etapa %d concluida! Removidas %d (min %d)", estado.etapa, removidasNaEtapa, minimo);
+                        j_texto((ponto_t){20, 40}, (cor_t){1,1,1,1}, texto1);
+                        int bonus = BONUS_BASE * estado.etapa;
+                        char texto2[128];
+                        snprintf(texto2, sizeof(texto2), "Bonus: %d. Pontuacao atual: %d. Enter para proxima etapa.", bonus, estado.pontuacao + bonus);
+                        j_texto((ponto_t){20, 80}, (cor_t){1,1,1,1}, texto2);
                     } else {
-                        char msg1[128];
-                        snprintf(msg1, sizeof(msg1), "Etapa %d falhada. Removidas %d (min %d). Fim de jogo.", gs.etapa, removed_in_stage, half);
-                        j_texto((ponto_t){20, 40}, (cor_t){1,1,1,1}, msg1);
-                        char msg2[128];
-                        snprintf(msg2, sizeof(msg2), "Score final: %d. Enter para continuar.", gs.score);
-                        j_texto((ponto_t){20, 80}, (cor_t){1,1,1,1}, msg2);
-                        defeated = true;
+                        char texto1[128];
+                        snprintf(texto1, sizeof(texto1), "Etapa %d falhada. Removidas %d (min %d). Fim de jogo.", estado.etapa, removidasNaEtapa, minimo);
+                        j_texto((ponto_t){20, 40}, (cor_t){1,1,1,1}, texto1);
+                        char texto2[128];
+                        snprintf(texto2, sizeof(texto2), "Pontuacao final: %d. Enter para continuar.", estado.pontuacao);
+                        j_texto((ponto_t){20, 80}, (cor_t){1,1,1,1}, texto2);
                     }
                     j_mostra();
-                    tecla_t tk = j_tecla();
-                    if (tk == T_ENTER) wait = false;
+                    tecla_t tecla = j_tecla();
+                    if (tecla == T_ENTER) {
+                        aguardando = false;
+                    }
                 }
-                j_seleciona_fonte(NULL, 15);
-                last_stage = gs.etapa;
-                if (passed) {
-                    int bonus = BONUS_BASE * gs.etapa;
-                    gs.score += bonus;
-                    gs.etapa++;
-                    if (gs.etapa > NUM_ETAPAS_MAX) gs.etapa = NUM_ETAPAS_MAX;
-                    removed_in_stage = 0;
-                    stage_start = j_relogio();
+                j_seleciona_fonte(NULL, 18);
+                ultimaEtapa = estado.etapa;
+                if (passou) {
+                    int bonus = BONUS_BASE * estado.etapa;
+                    estado.pontuacao += bonus;
+                    estado.etapa++;
+                    if (estado.etapa > NUM_ETAPAS_MAX) {
+                        estado.etapa = NUM_ETAPAS_MAX;
+                    }
+                    removidasNaEtapa = 0;
+                    inicioEtapa = j_relogio();
                     continue;
                 } else {
                     break;
                 }
             }
-            tecla_t t = j_tecla();
-            while (t != T_NADA) {
-                if (t == T_ESC) { exit_program = true; break; }
-                else if (t == 'm' || t == 'M') { mode_row = !mode_row; }
-                else if (t == 'c' || t == 'C') { history_show(&history); }
-                else if (t == T_CIMA) {
-                    if (mode_row) selected_row = (selected_row - 1 + NUM_LINHAS) % NUM_LINHAS;
-                    else selected_col = (selected_col - 1 + NUM_COLUNAS) % NUM_COLUNAS;
+            tecla_t tecla = j_tecla();
+            while (tecla != T_NADA) {
+                if (tecla == T_ESC) {
+                    encerrarPorESC = true;
+                    break;
                 }
-                else if (t == T_BAIXO) {
-                    if (mode_row) selected_row = (selected_row + 1) % NUM_LINHAS;
-                    else selected_col = (selected_col + 1) % NUM_COLUNAS;
-                }
-                else if (t == T_ESQUERDA || t == T_DIREITA) {
-                    int dir = (t == T_DIREITA) ? +1 : -1;
-                    if (mode_row) {
-                        game_state_rotate_row(&gs, selected_row, dir);
-                        game_state_apply_gravity(&gs);
-                        int rem;
-                        do { rem = game_state_remove_uniform_columns(&gs); if (rem>0) removed_in_stage+=rem; game_state_apply_gravity(&gs);} while(rem>0);
-                        if (game_state_first_row_empty(&gs)) game_state_spawn_first_row(&gs);
-                        game_state_apply_gravity(&gs);
-                        do { rem = game_state_remove_uniform_columns(&gs); if(rem>0) removed_in_stage+=rem; game_state_apply_gravity(&gs);} while(rem>0);
+                if (tecla == 'm' || tecla == 'M') {
+                    modoLinha = !modoLinha;
+                } else if (tecla == 'c' || tecla == 'C') {
+                    mostrar_historico(&historico);
+                } else if (tecla == T_CIMA) {
+                    if (modoLinha) {
+                        indiceLinhaSelecionada = (indiceLinhaSelecionada - 1 + NUM_LINHAS) % NUM_LINHAS;
                     } else {
-                        if (game_state_rotate_column(&gs, selected_col, dir)) {
-                            game_state_apply_gravity(&gs);
-                            int rem;
-                            do { rem = game_state_remove_uniform_columns(&gs); if(rem>0) removed_in_stage+=rem; game_state_apply_gravity(&gs);} while(rem>0);
-                            if (game_state_first_row_empty(&gs)) game_state_spawn_first_row(&gs);
-                            game_state_apply_gravity(&gs);
-                            do { rem = game_state_remove_uniform_columns(&gs); if(rem>0) removed_in_stage+=rem; game_state_apply_gravity(&gs);} while(rem>0);
+                        indiceColunaSelecionada = (indiceColunaSelecionada - 1 + NUM_COLUNAS) % NUM_COLUNAS;
+                    }
+                } else if (tecla == T_BAIXO) {
+                    if (modoLinha) {
+                        indiceLinhaSelecionada = (indiceLinhaSelecionada + 1) % NUM_LINHAS;
+                    } else {
+                        indiceColunaSelecionada = (indiceColunaSelecionada + 1) % NUM_COLUNAS;
+                    }
+                } else if (tecla == T_ESQUERDA || tecla == T_DIREITA) {
+                    int direcao;
+                    if (tecla == T_DIREITA) {
+                        direcao = +1;
+                    } else {
+                        direcao = -1;
+                    }
+                    if (modoLinha) {
+                        rotacionar_linha(&estado, indiceLinhaSelecionada, direcao);
+                        aplicar_gravidade(&estado);
+                        int removido;
+                        do {
+                            removido = remover_colunas_uniformes(&estado);
+                            if (removido > 0) {
+                                removidasNaEtapa += removido;
+                            }
+                            aplicar_gravidade(&estado);
+                        } while (removido > 0);
+                        if (primeira_linha_vazia(&estado)) {
+                            gerar_peca_primeira_linha(&estado);
+                        }
+                        aplicar_gravidade(&estado);
+                        do {
+                            removido = remover_colunas_uniformes(&estado);
+                            if (removido > 0) {
+                                removidasNaEtapa += removido;
+                            }
+                            aplicar_gravidade(&estado);
+                        } while (removido > 0);
+                    } else {
+                        bool rotacionou = rotacionar_coluna(&estado, indiceColunaSelecionada, direcao);
+                        if (rotacionou) {
+                            aplicar_gravidade(&estado);
+                            int removido;
+                            do {
+                                removido = remover_colunas_uniformes(&estado);
+                                if (removido > 0) {
+                                    removidasNaEtapa += removido;
+                                }
+                                aplicar_gravidade(&estado);
+                            } while (removido > 0);
+                            if (primeira_linha_vazia(&estado)) {
+                                gerar_peca_primeira_linha(&estado);
+                            }
+                            aplicar_gravidade(&estado);
+                            do {
+                                removido = remover_colunas_uniformes(&estado);
+                                if (removido > 0) {
+                                    removidasNaEtapa += removido;
+                                }
+                                aplicar_gravidade(&estado);
+                            } while (removido > 0);
                         }
                     }
-                }
-                else if ((t=='x'||t=='X') && mode_row) {
-                    int rem = game_state_clear_row(&gs, selected_row);
-                    if (rem>0) {
-                        removed_in_stage += rem;
-                        game_state_apply_gravity(&gs);
-                        int rem2;
-                        do { rem2=game_state_remove_uniform_columns(&gs); if(rem2>0) removed_in_stage+=rem2; game_state_apply_gravity(&gs);} while(rem2>0);
-                        if (game_state_first_row_empty(&gs)) game_state_spawn_first_row(&gs);
-                        game_state_apply_gravity(&gs);
-                        do { rem2=game_state_remove_uniform_columns(&gs); if(rem2>0) removed_in_stage+=rem2; game_state_apply_gravity(&gs);} while(rem2>0);
+                } else if ((tecla == 'x' || tecla == 'X') && modoLinha) {
+                    int removido = limpar_linha(&estado, indiceLinhaSelecionada);
+                    if (removido > 0) {
+                        removidasNaEtapa += removido;
+                        aplicar_gravidade(&estado);
+                        int remov2;
+                        do {
+                            remov2 = remover_colunas_uniformes(&estado);
+                            if (remov2 > 0) {
+                                removidasNaEtapa += remov2;
+                            }
+                            aplicar_gravidade(&estado);
+                        } while (remov2 > 0);
+                        if (primeira_linha_vazia(&estado)) {
+                            gerar_peca_primeira_linha(&estado);
+                        }
+                        aplicar_gravidade(&estado);
+                        do {
+                            remov2 = remover_colunas_uniformes(&estado);
+                            if (remov2 > 0) {
+                                removidasNaEtapa += remov2;
+                            }
+                            aplicar_gravidade(&estado);
+                        } while (remov2 > 0);
                     }
                 }
-                t = j_tecla();
+                tecla = j_tecla();
             }
-            if (exit_program) break;
-            // Render
-            for (int r = 0; r < NUM_LINHAS; r++) {
-                for (int c = 0; c < NUM_COLUNAS; c++) {
-                    int idx = gs.board[r][c];
-                    cor_t cor = (idx==EMPTY_CELL? (cor_t){0.2f,0.2f,0.2f,1.0f}: COLORS[idx%COLOR_COUNT]);
-                    ponto_t inicio={.x=100 + c*CELL_SIZE,.y=50 + r*CELL_SIZE};
-                    tamanho_t tam={.largura=CELL_SIZE-2,.altura=CELL_SIZE-2};
-                    retangulo_t rect={.inicio={inicio.x+1,inicio.y+1},.tamanho=tam};
-                    j_retangulo(rect,2.0f,(cor_t){0,0,0,1},cor);
-                    if (mode_row && r==selected_row) j_linha((ponto_t){100,50+selected_row*CELL_SIZE+CELL_SIZE/2}, (ponto_t){100+NUM_COLUNAS*CELL_SIZE,50+selected_row*CELL_SIZE+CELL_SIZE/2},2.0f,(cor_t){1,1,1,1});
-                    if (!mode_row && c==selected_col) j_linha((ponto_t){100+selected_col*CELL_SIZE+CELL_SIZE/2,50}, (ponto_t){100+selected_col*CELL_SIZE+CELL_SIZE/2,50+NUM_LINHAS*CELL_SIZE},2.0f,(cor_t){1,1,1,1});
+            if (encerrarPorESC) {
+                break;
+            }
+            for (int linha = 0; linha < NUM_LINHAS; linha++) {
+                for (int coluna = 0; coluna < NUM_COLUNAS; coluna++) {
+                    int valor = estado.tabuleiro[linha][coluna];
+                    cor_t cor;
+                    if (valor == CELULA_VAZIA) {
+                        cor = (cor_t){0.2f, 0.2f, 0.2f, 1.0f};
+                    } else {
+                        int idx = valor % QTD_CORES;
+                        cor = CORES[idx];
+                    }
+                    ponto_t posicao;
+                    posicao.x = 100 + coluna * TAM_CELULA;
+                    posicao.y = 50 + linha * TAM_CELULA;
+                    tamanho_t tamanhoCelula;
+                    tamanhoCelula.largura = TAM_CELULA - 2;
+                    tamanhoCelula.altura = TAM_CELULA - 2;
+                    retangulo_t ret;
+                    ret.inicio.x = posicao.x + 1;
+                    ret.inicio.y = posicao.y + 1;
+                    ret.tamanho = tamanhoCelula;
+                    cor_t corBorda;
+                    corBorda.vermelho = 0;
+                    corBorda.verde = 0;
+                    corBorda.azul = 0;
+                    corBorda.opacidade = 1;
+                    j_retangulo(ret, 2.0f, corBorda, cor);
+                    if (modoLinha && linha == indiceLinhaSelecionada) {
+                        ponto_t p1; ponto_t p2;
+                        p1.x = 100;
+                        p1.y = 50 + indiceLinhaSelecionada * TAM_CELULA + TAM_CELULA / 2;
+                        p2.x = 100 + NUM_COLUNAS * TAM_CELULA;
+                        p2.y = p1.y;
+                        j_linha(p1, p2, 2.0f, (cor_t){1,1,1,1});
+                    }
+                    if (!modoLinha && coluna == indiceColunaSelecionada) {
+                        ponto_t p1; ponto_t p2;
+                        p1.x = 100 + indiceColunaSelecionada * TAM_CELULA + TAM_CELULA / 2;
+                        p1.y = 50;
+                        p2.x = p1.x;
+                        p2.y = 50 + NUM_LINHAS * TAM_CELULA;
+                        j_linha(p1, p2, 2.0f, (cor_t){1,1,1,1});
+                    }
                 }
             }
-            char buf[64];
-            snprintf(buf,sizeof(buf),"Score: %d  Stage: %d  Time: %.0f",gs.score,gs.etapa,remaining>0?remaining:0);
-            j_texto((ponto_t){20,50+NUM_LINHAS*CELL_SIZE+20},(cor_t){1,1,1,1},buf);
+            char buffer[64];
+            snprintf(buffer, sizeof(buffer), "Pontuacao: %d  Etapa: %d  Tempo: %.0f", estado.pontuacao, estado.etapa, restante > 0 ? restante : 0);
+            j_texto((ponto_t){20, 50 + NUM_LINHAS * TAM_CELULA + 20}, (cor_t){1,1,1,1}, buffer);
             j_mostra();
-            if (exit_program) break;
         }
-        if (exit_program) break;
-        // Após fim, prompt nome
-        char name[MAX_NAME_LEN];
-        prompt_name(name);
-        if (strlen(name) > 0) history_add(&history, name, gs.score, last_stage);
-        // Volta à tela de instruções
-        show_instructions(&history);
+        if (encerrarPorESC) {
+            char nome[TAM_MAX_NOME];
+            solicitar_nome(nome);
+            if (strlen(nome) > 0) {
+                adicionar_registro(&historico, nome, estado.pontuacao, ultimaEtapa);
+            }
+            encerrarPrograma = true;
+            break;
+        }
+        char nome[TAM_MAX_NOME];
+        solicitar_nome(nome);
+        if (strlen(nome) > 0) {
+            adicionar_registro(&historico, nome, estado.pontuacao, ultimaEtapa);
+        }
+        mostrar_instrucoes(&historico);
     }
-    history_free(&history);
+    liberar_historico(&historico);
     j_finaliza();
     return 0;
 }
