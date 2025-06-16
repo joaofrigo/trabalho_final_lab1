@@ -1,0 +1,11 @@
+pasta allegro:
+
+C:\Allegro\Downloads\allegro
+
+comando padrão:
+
+gcc main.c -IC:/Allegro/Downloads/allegro/include -LC:/Allegro/Downloads/allegro/lib -lallegro -lallegro_main -lallegro_primitives -o main.exe
+
+Para rodar;
+
+.\main.exe
