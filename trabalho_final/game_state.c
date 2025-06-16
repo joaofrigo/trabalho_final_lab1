@@ -61,7 +61,6 @@ void game_state_apply_gravity(GameState *gs) {
                 write_r--;
             }
         }
-        // acima de write_r ficam vazios
         for (int r = write_r; r >= 0; r--) {
             gs->board[r][c] = EMPTY_CELL;
         }
@@ -81,7 +80,6 @@ int game_state_remove_uniform_columns(GameState *gs) {
             }
         }
         if (uniform) {
-            // remove todas
             for (int r = 0; r < NUM_LINHAS; r++) {
                 gs->board[r][c] = EMPTY_CELL;
                 total_removed++;
@@ -89,7 +87,6 @@ int game_state_remove_uniform_columns(GameState *gs) {
         }
     }
     if (total_removed > 0) {
-        // atualiza pontuação: cada peça removida vale pontos conforme etapa
         gs->score += total_removed * gs->etapa;
     }
     return total_removed;
@@ -119,9 +116,7 @@ int game_state_clear_row(GameState *gs, int row) {
         }
     }
     if (removed > 0) {
-        // penalidade fixa
         gs->score -= 2;
-        // após remoção, aplicar gravidade e remoções automáticas externa ao uso desta função
     }
     return removed;
 }
