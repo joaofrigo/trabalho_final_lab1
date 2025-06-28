@@ -1,3 +1,5 @@
 batatinha;446;4
+bopbo;248;2
+batata;63;2
 tristonho;3;1
 ze ninguem;-126;1

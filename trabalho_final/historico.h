@@ -21,4 +21,4 @@ void liberar_historico(Historico *h);
 void adicionar_registro(Historico *h, const char *nome, int pontuacao, int etapa);
 void mostrar_historico(const Historico *h);
 
-#endif // HISTORICO_H
+#endif
