@@ -13,11 +13,10 @@ static const cor_t CORES[] = {
 static const int QTD_CORES = sizeof(CORES) / sizeof(CORES[0]);
 
 // Exibe instruções
-static void mostrar_instrucoes(Historico *h)
+static bool mostrar_instrucoes(Historico *h)
 {
     j_seleciona_fonte(NULL,18);
-    bool esperando = true;
-    while (esperando) {
+    while (1) {
         j_texto((ponto_t){20,40},(cor_t){1,1,1,1},"Controles:");
         j_texto((ponto_t){20,80},(cor_t){1,1,1,1},"M: alterna modo Linha/Coluna");
         j_texto((ponto_t){20,110},(cor_t){1,1,1,1},"Setas: mover selecionado / girar");
@@ -27,13 +26,16 @@ static void mostrar_instrucoes(Historico *h)
         j_texto((ponto_t){20,240},(cor_t){1,1,1,1},"Pressione Enter para iniciar...");
         j_mostra();
         tecla_t t = j_tecla();
-        if (t == T_ENTER || t == T_ESC) {
-            esperando = false;
+        if (t == T_ENTER) {
+            return true;
+        } else if (t == T_ESC) {
+            return false;
         } else if (t == 'c' || t == 'C') {
             mostrar_historico(h);
         }
     }
 }
+
 
 // Solicita nome do jogador
 static void solicitar_nome(char *nome)
@@ -214,9 +216,14 @@ int main(void)
     j_inicializa(t,"Jogo de Tabuleiro");
     Historico h;
     inicializar_historico(&h);
-    mostrar_instrucoes(&h);
-    executar_partida(&h);
+
+    while (1) {
+        if (!mostrar_instrucoes(&h)) break;
+        executar_partida(&h);
+    }
+
     liberar_historico(&h);
     j_finaliza();
     return 0;
 }
+
